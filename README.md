@@ -1,47 +1,59 @@
-# LMChat CLI
+# Cloudflare AI Worker Chat CLI
 
-Um cliente CLI em bash para interagir com modelos de linguagem locais via API do [lmstudio](lmstudio.ai)
+Um cliente CLI em bash para interagir com modelos de linguagem via Cloudflare AI Workers
 
 ## Requisitos
 
 - `curl`
 - `jq`
-- Um servidor LLM local do lmstudio rodando na porta 1234 ou qualquer outro servidor em formato compatível com OpenAI
+- Uma conta Cloudflare com acesso aos AI Workers
+- Token de autenticação do Cloudflare
+- ID da conta Cloudflare
 
-## Instalação
+## Configuração
 
+1. Configure as variáveis de ambiente:
 ```bash
-chmod +x lmchat
-sudo mv lmchat /usr/local/bin/
+export CLOUDFLARE_AUTH_TOKEN="seu-token-aqui"
+export CLOUDFLARE_ACCOUNT_ID="seu-account-id-aqui"
+```
+
+2. Instale o script:
+```bash
+chmod +x llama
+sudo mv llama /usr/local/bin/
 ```
 
 ## Uso
 
 ```bash
-lmchat [--model nome-do-modelo] sua mensagem aqui
+llama [--model nome-do-modelo] sua mensagem aqui
 ```
 
 ### Opções
 
-- `--model`: Especifica qual modelo usar (padrão: "hermes-3-llama-3.2-3b")
+- `--model`: Especifica qual modelo usar (padrão: "@cf/meta/llama-3.3-70b-instruct-fp8-fast")
 
 ### Exemplo
 
 ```bash
-lmchat "Qual é a capital do Brasil?"
-lmchat --model different-model "Outra pergunta aqui"
+llama "Qual é a capital do Brasil?"
+llama --model @cf/meta/llama-3.3-70b-instruct qual sua opinião sobre IA?
 ```
 
 ## Características
 
-- Mantém histórico de conversas em `/tmp/lmchat_messages`
+- Mantém histórico de conversas em `/tmp/llamachat_messages`
 - Suporta streaming de respostas
 - Temperatura do modelo configurável (padrão: 0.7)
 - Formatação JSON automática das mensagens
-- Compatível com a API OpenAI
+- Integração com Cloudflare AI Workers
+
+## Modelos Disponíveis
+https://developers.cloudflare.com/workers-ai/models/
 
 ## Notas Técnicas
 
 - As mensagens são armazenadas no formato ChatGPT (roles: user/assistant)
-- Utiliza endpoints compatíveis com OpenAI (`/v1/chat/completions`)
-- Requer um servidor LLM local rodando em `http://localhost:1234`
+- Utiliza a API do Cloudflare AI Workers
+- Requer autenticação via token do Cloudflare
