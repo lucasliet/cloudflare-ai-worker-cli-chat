@@ -1,0 +1,65 @@
+#!/bin/bash
+
+declare -a lmchat_messages
+if [ -f /tmp/lmchat_messages ]; then
+  readarray -t lmchat_messages < /tmp/lmchat_messages
+else
+  lmchat_messages=()
+fi
+
+model="hermes-3-llama-3.2-3b"
+temperature=0.7
+
+# Processar argumentos
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --model)
+      model="$2"
+      shift 2
+      ;;
+    *)
+      message="${message:+$message }$1"
+      shift
+      ;;
+  esac
+done
+
+if [ -z "$message" ]; then
+  echo "Usage: lmchat [--model model-name] your message"
+  exit 1
+fi
+
+lmchat_messages+=("{\"role\": \"user\", \"content\": \"$message\"}")
+
+messages_json=$(printf "%s," "${lmchat_messages[@]}")
+messages_json="[${messages_json%,}]"
+
+temp_response_file=$(mktemp)
+curl -s -N -X POST http://localhost:1234/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": '"$messages_json"',
+    "model": "'"$model"'",
+    "temperature": '"$temperature"',
+    "stream": true
+  }' | while read -r line; do
+    if [[ $line == data:* ]]; then
+      content=$(echo "${line#data: }" | jq -r '.choices[0].delta.content // empty' 2>/dev/null)
+      if [ ! -z "$content" ]; then
+        echo -n "$content"
+        echo -n "$content" >> "$temp_response_file"
+      fi
+    fi
+done
+
+echo # Nova linha ao final da resposta
+
+response=$(<"$temp_response_file")
+rm "$temp_response_file"
+
+json_message_escape() {
+  echo -n "$1" | jq -s -R -r @json
+}
+
+lmchat_messages+=("{\"role\": \"assistant\", \"content\": $(json_message_escape "$response")}")
+printf '%s\n' "${lmchat_messages[@]}" > /tmp/lmchat_messages
