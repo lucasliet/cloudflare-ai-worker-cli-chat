@@ -2,12 +2,15 @@
 
 declare -a llamachat_messages
 if [ -f /tmp/llamachat_messages ]; then
-  readarray -t llamachat_messages < /tmp/llamachat_messages
+  llamachat_messages=()
+  while IFS= read -r line; do
+    llamachat_messages+=("$line")
+  done < /tmp/llamachat_messages
 else
   llamachat_messages=()
 fi
 
-model="@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+model="@cf/meta/llama-4-scout-17b-16e-instruct"
 temperature=0.7
 
 # Processar argumentos
