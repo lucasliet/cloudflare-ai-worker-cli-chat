@@ -12,13 +12,18 @@ Um cliente CLI em bash para interagir com modelos de linguagem via Cloudflare AI
 
 ## Configuração
 
-1. Configure as variáveis de ambiente:
+1. Baixe o script
+```bash
+curl -O https://raw.githubusercontent.com/lucasliet/cloudflare-ai-worker-cli-chat/refs/heads/main/llama
+```
+
+3. Configure as variáveis de ambiente:
 ```bash
 export CLOUDFLARE_AUTH_TOKEN="seu-token-aqui"
 export CLOUDFLARE_ACCOUNT_ID="seu-account-id-aqui"
 ```
 
-2. Instale o script:
+3. Instale o script:
 ```bash
 chmod +x llama
 sudo mv llama /usr/local/bin/
