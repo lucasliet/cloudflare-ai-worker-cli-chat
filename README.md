@@ -37,8 +37,9 @@ llama [--model nome-do-modelo] sua mensagem aqui
 ### Exemplo
 
 ```bash
+llama escreva um poema
 llama "Qual é a capital do Brasil?"
-llama --model @cf/meta/llama-3.3-70b-instruct qual sua opinião sobre IA?
+llama --model @cf/meta/llama-3.3-70b-instruct "qual sua opinião sobre IA?"
 ```
 
 ## Características
