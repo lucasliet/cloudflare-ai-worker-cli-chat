@@ -1,5 +1,25 @@
 #!/bin/bash
 
+required_env_vars=(
+    "CLOUDFLARE_ACCOUNT_ID"
+    "CLOUDFLARE_AUTH_TOKEN"
+)
+
+missing_vars=0
+
+for var in "${required_env_vars[@]}"; do
+    if [[ -z ${!var} ]]; then
+        echo "Error: The environment variable '$var' is not set."
+        missing_vars=1
+    fi
+done
+
+# Exit if any variable is missing
+if [[ ${missing_vars} -eq 1 ]]; then
+    echo "Please set the missing environment variables and try again."
+    exit 1
+fi
+
 declare -a llamachat_messages
 if [ -f /tmp/llamachat_messages ]; then
   llamachat_messages=()
