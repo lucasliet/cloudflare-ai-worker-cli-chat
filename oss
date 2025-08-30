@@ -1,4 +1,23 @@
 #!/bin/bash
+required_env_vars=(
+    "CLOUDFLARE_ACCOUNT_ID"
+    "CLOUDFLARE_AUTH_TOKEN"
+)
+
+missing_vars=0
+
+for var in "${required_env_vars[@]}"; do
+    if [[ -z ${!var} ]]; then
+        echo "Error: The environment variable '$var' is not set."
+        missing_vars=1
+    fi
+done
+
+# Exit if any variable is missing
+if [[ ${missing_vars} -eq 1 ]]; then
+    echo "Please set the missing environment variables and try again."
+    exit 1
+fi
 
 declare -a osschat_messages
 json_message_escape() {
@@ -43,9 +62,9 @@ messages_json="[${messages_json%,}]"
 temp_response_file=$(mktemp)
 
 # Executar curl e capturar saída completa (incluindo erros)
-curl_output=$(curl -s -N "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_AI_ACCOUNT_ID/ai/v1/responses" \
+curl_output=$(curl -s -N "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/ai/v1/responses" \
   -X POST \
-  -H "Authorization: Bearer $CLOUDFLARE_AI_API_KEY" \
+  -H "Authorization: Bearer $CLOUDFLARE_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: text/event-stream" \
   -d '{
