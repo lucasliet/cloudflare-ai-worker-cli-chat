@@ -1,0 +1,105 @@
+#!/bin/bash
+
+declare -a osschat_messages
+json_message_escape() {
+  echo -n "$1" | jq -s -R -r @json
+}
+if [ -f /tmp/osschat_messages ]; then
+  osschat_messages=()
+  while IFS= read -r line; do
+    osschat_messages+=("$line")
+  done < /tmp/osschat_messages
+else
+  osschat_messages=()
+fi
+
+model="@cf/openai/gpt-oss-120b"
+temperature=0.7
+
+# Processar argumentos
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --model)
+      model="$2"
+      shift 2
+      ;;
+    *)
+      message="${message:+$message }$1"
+      shift
+      ;;
+  esac
+done
+
+if [ -z "$message" ]; then
+  echo "Usage: lmchat [--model model-name] your message"
+  exit 1
+fi
+
+osschat_messages+=("{\"role\": \"user\", \"content\": $(json_message_escape "$message")}")
+
+messages_json=$(printf "%s," "${osschat_messages[@]}")
+messages_json="[${messages_json%,}]"
+
+temp_response_file=$(mktemp)
+
+# Executar curl e capturar saída completa (incluindo erros)
+curl_output=$(curl -s -N "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_AI_ACCOUNT_ID/ai/v1/responses" \
+  -X POST \
+  -H "Authorization: Bearer $CLOUDFLARE_AI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -d '{
+    "model": "'$model'",
+    "input": '"$messages_json"',
+    "temperature": '"$temperature"'
+  }' 2>&1)
+
+# Verificar se há erro na resposta
+if echo "$curl_output" | jq -e '.error' >/dev/null 2>&1; then
+  error_msg=$(echo "$curl_output" | jq -r '.error.message // "Erro desconhecido no endpoint"')
+  echo "Erro do endpoint: $error_msg" >&2
+  rm -f "$temp_response_file"
+  exit 1
+fi
+
+# Verificar se a resposta é JSON único (não streaming)
+if echo "$curl_output" | jq -e '.output' >/dev/null 2>&1; then
+  content=$(echo "$curl_output" | jq -r '.output[] | select(.type == "message") | .content[]?.text // empty' 2>/dev/null)
+  if [ -n "$content" ]; then
+    echo -n "$content"
+    echo "$content" > "$temp_response_file"
+  fi
+else
+  # Processar como streaming SSE
+  echo "$curl_output" | while read -r line; do
+    if [[ $line == data:* ]]; then
+      payload="${line#data: }"
+      if [ "$payload" = "[DONE]" ] || [ -z "$payload" ]; then
+        continue
+      fi
+      content=""
+      if echo "$payload" | jq . >/dev/null 2>&1; then
+        content=$(echo "$payload" | jq -r '.output[]? | select(.type == "message") | .content[]?.text // empty' 2>/dev/null)
+      else
+        content="$payload"
+      fi
+      if [ -n "$content" ]; then
+        printf "%s" "$content"
+        printf "%s" "$content" >> "$temp_response_file"
+      fi
+    fi
+  done
+fi
+
+echo # Nova linha ao final da resposta
+
+response=$(<"$temp_response_file")
+rm "$temp_response_file"
+
+if [ -z "$response" ]; then
+  echo "Nenhuma resposta recebida do LLM." >&2
+  exit 1
+fi
+
+osschat_messages+=("{\"role\": \"assistant\", \"content\": $(json_message_escape "$response")}")
+printf '%s\n' "${osschat_messages[@]}" > /tmp/osschat_messages
