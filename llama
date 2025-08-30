@@ -20,6 +20,8 @@ if [[ ${missing_vars} -eq 1 ]]; then
     exit 1
 fi
 
+#!/bin/bash
+
 declare -a llamachat_messages
 if [ -f /tmp/llamachat_messages ]; then
   llamachat_messages=()
@@ -58,7 +60,9 @@ messages_json=$(printf "%s," "${llamachat_messages[@]}")
 messages_json="[${messages_json%,}]"
 
 temp_response_file=$(mktemp)
-curl -s -N "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/ai/run/$model" \
+
+# Executar curl e capturar saída completa (incluindo erros)
+curl_output=$(curl -s -N "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/ai/run/$model" \
   -X POST \
   -H "Authorization: Bearer $CLOUDFLARE_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
@@ -66,20 +70,36 @@ curl -s -N "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID
     "messages": '"$messages_json"',
     "temperature": '"$temperature"',
     "stream": true
-  }' | while read -r line; do
-    if [[ $line == data:* ]]; then
-      content=$(echo "${line#data: }" | jq -r '.response // empty' 2>/dev/null)
-      if [ ! -z "$content" ]; then
-        echo -n "$content"
-        echo -n "$content" >> "$temp_response_file"
-      fi
+  }' 2>&1)
+
+# Verificar se há erro na resposta
+if echo "$curl_output" | jq -e '.error' >/dev/null 2>&1; then
+  error_msg=$(echo "$curl_output" | jq -r '.error.message // "Erro desconhecido no endpoint"')
+  echo "Erro do endpoint: $error_msg" >&2
+  rm -f "$temp_response_file"
+  exit 1
+fi
+
+# Processar streaming se não houver erro
+echo "$curl_output" | while read -r line; do
+  if [[ $line == data:* ]]; then
+    content=$(echo "${line#data: }" | jq -r '.response // empty' 2>/dev/null)
+    if [ ! -z "$content" ]; then
+      echo -n "$content"
+      echo -n "$content" >> "$temp_response_file"
     fi
+  fi
 done
 
 echo # Nova linha ao final da resposta
 
 response=$(<"$temp_response_file")
 rm "$temp_response_file"
+
+if [ -z "$response" ]; then
+  echo "Nenhuma resposta recebida do LLM." >&2
+  exit 1
+fi
 
 json_message_escape() {
   echo -n "$1" | jq -s -R -r @json
