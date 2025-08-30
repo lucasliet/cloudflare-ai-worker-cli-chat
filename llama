@@ -20,8 +20,6 @@ if [[ ${missing_vars} -eq 1 ]]; then
     exit 1
 fi
 
-#!/bin/bash
-
 declare -a llamachat_messages
 if [ -f /tmp/llamachat_messages ]; then
   llamachat_messages=()
